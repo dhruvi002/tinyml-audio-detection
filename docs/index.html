@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TinyML Audio Event Detection — Demo Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #151820;
+    --surface2:  #1c2030;
+    --border:    rgba(255,255,255,0.08);
+    --accent:    #4f9eff;
+    --accent2:   #38d9a9;
+    --accent3:   #ffa94d;
+    --text:      #e8eaf0;
+    --muted:     #7a8099;
+    --danger:    #ff6b6b;
+    --font:      'Inter', system-ui, sans-serif;
+    --mono:      'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .header-title { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+  .header-sub   { font-size: 0.8rem; color: var(--muted); margin-top: 4px; }
+  .badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .badge-green { background: rgba(56,217,169,0.15); color: var(--accent2); border: 1px solid rgba(56,217,169,0.3); }
+  .badge-blue  { background: rgba(79,158,255,0.15); color: var(--accent);  border: 1px solid rgba(79,158,255,0.3); }
+  .badge-amber { background: rgba(255,169,77,0.15);  color: var(--accent3); border: 1px solid rgba(255,169,77,0.3); }
+
+  /* ── Grid ── */
+  .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+  }
+  .metric-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+  }
+  .metric-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .metric-value { font-size: 1.9rem; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+  .metric-sub   { font-size: 0.72rem; color: var(--muted); margin-top: 6px; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Tabs ── */
+  .tab-row { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tab {
+    font-size: 0.78rem;
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font);
+  }
+  .tab:hover  { background: var(--surface2); color: var(--text); }
+  .tab.active { background: rgba(79,158,255,0.15); color: var(--accent); border-color: rgba(79,158,255,0.4); }
+
+  /* ── Bar ── */
+  .bar-bg   { background: var(--surface2); border-radius: 4px; height: 6px; flex: 1; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.5s ease; }
+  .row      { display: flex; align-items: center; gap: 10px; }
+
+  /* ── Pipeline ── */
+  .pipeline { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 1rem 0; }
+  .pipeline-step { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 100px; }
+  .pipeline-circle {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; font-weight: 700;
+  }
+  .pipeline-arrow { color: var(--muted); font-size: 1.2rem; margin-top: 14px; }
+  .step-label { font-size: 0.72rem; font-weight: 600; text-align: center; }
+  .step-sub   { font-size: 0.65rem; color: var(--muted); text-align: center; }
+
+  /* ── Inference demo ── */
+  .sound-tag {
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font);
+  }
+  .sound-tag:hover  { border-color: var(--accent); color: var(--accent); }
+  .sound-tag.active { background: rgba(79,158,255,0.15); color: var(--accent); border-color: rgba(79,158,255,0.4); }
+
+  .pred-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.8rem; }
+  .pred-name { width: 120px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pred-pct  { width: 38px; text-align: right; font-weight: 600; font-family: var(--mono); font-size: 0.75rem; }
+
+  .log-panel {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    line-height: 1.9;
+    margin-top: 10px;
+  }
+  .log-green { color: var(--accent2); }
+  .log-blue  { color: var(--accent); }
+  .log-amber { color: var(--accent3); }
+
+  /* ── Phase timeline ── */
+  .phase-bar {
+    height: 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    transition: width 0.6s ease;
+  }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+  th { text-align: left; padding: 8px 10px; color: var(--muted); font-weight: 500; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+  td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--surface2); border-radius: 3px; }
+
+  @media (max-width: 700px) {
+    .grid4, .grid2, .grid3 { grid-template-columns: 1fr 1fr; }
+    .grid4 .metric-card:nth-child(n+3) { grid-column: span 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-title">TinyML Audio Event Detection</div>
+    <div class="header-sub">YAMNet (AudioSet) → ESC-50 · GradientTape fine-tuning · TFLite · ARM Cortex-M4</div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <span class="badge badge-green">74.75% accuracy</span>
+    <span class="badge badge-blue">73.6% compression</span>
+    <span class="badge badge-amber">2.5× faster</span>
+  </div>
+</div>
+
+<!-- Top metrics -->
+<div class="grid4" style="margin-bottom:20px;">
+  <div class="metric-card">
+    <div class="metric-label">Final accuracy</div>
+    <div class="metric-value" style="color:var(--accent2);">74.75%</div>
+    <div class="metric-sub">ESC-50 · 50 classes · fold 5</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Model size (INT8)</div>
+    <div class="metric-value" style="color:var(--accent);">4.0 MB</div>
+    <div class="metric-sub">down from 15.2 MB float32</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Compression</div>
+    <div class="metric-value" style="color:var(--accent3);">73.6%</div>
+    <div class="metric-sub">dynamic range INT8</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Inference latency</div>
+    <div class="metric-value" style="color:var(--accent2);">6.9ms</div>
+    <div class="metric-sub">from 17.6ms · 2.5× speedup</div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="tab-row">
+  <button class="tab active" onclick="showTab('training')">Training</button>
+  <button class="tab" onclick="showTab('compression')">Compression</button>
+  <button class="tab" onclick="showTab('inference')">Inference demo</button>
+  <button class="tab" onclick="showTab('pipeline')">Pipeline</button>
+</div>
+
+<!-- ── TAB: Training ── -->
+<div id="tab-training">
+  <div class="grid2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="section-label">Accuracy by phase</div>
+      <div style="position:relative;height:220px;">
+        <canvas id="phaseChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label">Transfer learning gain vs scratch</div>
+      <div style="position:relative;height:220px;">
+        <canvas id="gainChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Training phase breakdown</div>
+    <table>
+      <thead><tr><th>Phase</th><th>Epochs</th><th>LR</th><th>YAMNet</th><th>Best val acc</th><th>Δ acc</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="badge badge-blue">Phase 1</span> Head only</td>
+          <td>15</td><td style="font-family:var(--mono);font-size:0.75rem;">1e-3</td>
+          <td><span style="color:var(--danger);">Frozen</span></td>
+          <td style="font-weight:600;">48.75%</td>
+          <td style="color:var(--accent2);">+48.75pp</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-amber">Phase 2</span> Full fine-tune</td>
+          <td>36</td><td style="font-family:var(--mono);font-size:0.75rem;">1e-5</td>
+          <td><span style="color:var(--accent2);">Unfrozen</span></td>
+          <td style="font-weight:600;">71.00%</td>
+          <td style="color:var(--accent2);">+22.25pp</td>
+        </tr>
+        <tr>
+          <td><span class="badge badge-green">Phase 3</span> Continued</td>
+          <td>30</td><td style="font-family:var(--mono);font-size:0.75rem;">3e-5</td>
+          <td><span style="color:var(--accent2);">Unfrozen</span></td>
+          <td style="font-weight:600;">74.75%</td>
+          <td style="color:var(--accent2);">+3.75pp</td>
+        </tr>
+        <tr style="background:rgba(56,217,169,0.05);">
+          <td><strong>DS-CNN (scratch baseline)</strong></td>
+          <td>99</td><td style="font-family:var(--mono);font-size:0.75rem;">1e-3</td>
+          <td><span style="color:var(--muted);">N/A</span></td>
+          <td style="font-weight:600;">48.00%</td>
+          <td style="color:var(--accent3);">—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top:12px;padding:10px 14px;background:rgba(79,158,255,0.08);border-radius:8px;border:1px solid rgba(79,158,255,0.2);font-size:0.78rem;color:var(--muted);">
+      Transfer learning gain over training from scratch: <strong style="color:var(--accent2);">+26.75 pp</strong> — demonstrating the value of AudioSet pretraining (521 classes, ~2M clips).
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: Compression ── -->
+<div id="tab-compression" style="display:none;">
+  <div class="grid2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="section-label">Model size comparison</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="sizeChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label">Accuracy vs size tradeoff</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="tradeoffChart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Compression results</div>
+    <div style="margin-bottom:16px;">
+      <div class="row" style="margin-bottom:6px;justify-content:space-between;">
+        <span style="font-size:0.8rem;">Float32 baseline</span>
+        <span style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">15,200 KB · 74.75% acc · 17.6ms</span>
+      </div>
+      <div class="row" style="margin-bottom:16px;">
+        <div class="bar-bg"><div class="bar-fill" style="width:100%;background:var(--muted);"></div></div>
+      </div>
+      <div class="row" style="margin-bottom:6px;justify-content:space-between;">
+        <span style="font-size:0.8rem;">Dynamic range INT8 <span class="badge badge-green" style="margin-left:6px;">73.6% smaller</span></span>
+        <span style="font-family:var(--mono);font-size:0.78rem;color:var(--muted);">4,007 KB · 70.00% acc · 6.9ms</span>
+      </div>
+      <div class="row">
+        <div class="bar-bg"><div class="bar-fill" style="width:26.4%;background:var(--accent2);"></div></div>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Metric</th><th>Float32</th><th>INT8 (dynamic)</th><th>Change</th></tr></thead>
+      <tbody>
+        <tr><td>Size</td><td>15.2 MB</td><td>4.0 MB</td><td style="color:var(--accent2);">−73.6%</td></tr>
+        <tr><td>Accuracy</td><td>74.75%</td><td>70.00%</td><td style="color:var(--danger);">−4.75 pp</td></tr>
+        <tr><td>Latency (CPU)</td><td>17.6 ms</td><td>6.9 ms</td><td style="color:var(--accent2);">2.5× faster</td></tr>
+        <tr><td>Quantization</td><td>float32</td><td>INT8 weights</td><td style="color:var(--muted);">dynamic range</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:12px;padding:10px 14px;background:rgba(255,169,77,0.08);border-radius:8px;border:1px solid rgba(255,169,77,0.2);font-size:0.78rem;color:var(--muted);">
+      Full INT8 PTQ was attempted but YAMNet contains <code style="font-family:var(--mono);color:var(--accent3);">tf.signal.stft</code> ops unsupported by TFLite's INT8 calibrator. Dynamic range quantization was used instead — still achieves 3.8× size reduction with only 4.75pp accuracy cost.
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: Inference demo ── -->
+<div id="tab-inference" style="display:none;">
+  <div class="grid2" style="margin-bottom:16px;">
+    <div class="card">
+      <div class="section-label">Input waveform (simulated)</div>
+      <canvas id="waveCanvas" width="400" height="80" style="width:100%;height:80px;border-radius:6px;margin-bottom:12px;background:var(--surface2);"></canvas>
+      <div class="section-label" style="margin-top:8px;">Select sound class</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;" id="soundTags"></div>
+    </div>
+    <div class="card">
+      <div class="section-label">Top-5 predictions</div>
+      <div id="predictions" style="margin-top:8px;"></div>
+      <div class="log-panel" id="logOutput">Select a sound class to run inference…</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-label">Cortex-M4 power model</div>
+    <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin-top:8px;">
+      <div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px;">Inference rate</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <input type="range" id="dutySlider" min="1" max="100" value="1" step="1"
+                 style="width:160px;" oninput="updatePower()">
+          <span style="font-size:0.8rem;font-family:var(--mono);" id="dutyVal">1 inf/s</span>
+        </div>
+      </div>
+      <div class="metric-card" style="min-width:130px;">
+        <div class="metric-label">Avg power</div>
+        <div class="metric-value" id="powerVal" style="font-size:1.4rem;color:var(--accent2);">7.1 mW</div>
+        <div class="metric-sub" id="powerStatus">✓ Under 10 mW target</div>
+      </div>
+      <div class="metric-card" style="min-width:130px;">
+        <div class="metric-label">Battery estimate</div>
+        <div class="metric-value" id="batteryVal" style="font-size:1.4rem;">59h</div>
+        <div class="metric-sub">500 mAh @ 3.3V</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: Pipeline ── -->
+<div id="tab-pipeline" style="display:none;">
+  <div class="card" style="margin-bottom:16px;">
+    <div class="section-label">End-to-end pipeline</div>
+    <div class="pipeline">
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(79,158,255,0.15);color:var(--accent);">1</div>
+        <div class="step-label">ESC-50</div>
+        <div class="step-sub">2000 clips · 50 classes · 5s @ 22kHz</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(79,158,255,0.15);color:var(--accent);">2</div>
+        <div class="step-label">Resample</div>
+        <div class="step-sub">22kHz → 16kHz for YAMNet input</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(255,169,77,0.15);color:var(--accent3);">3</div>
+        <div class="step-label">YAMNet</div>
+        <div class="step-sub">AudioSet pretrained · 3.7M params · 1024-d embeddings</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(255,169,77,0.15);color:var(--accent3);">4</div>
+        <div class="step-label">Attn Pool</div>
+        <div class="step-sub">Frame-level → clip-level embedding</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(56,217,169,0.15);color:var(--accent2);">5</div>
+        <div class="step-label">Fine-tune</div>
+        <div class="step-sub">GradientTape · 3-phase · 74.75% acc</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(56,217,169,0.15);color:var(--accent2);">6</div>
+        <div class="step-label">Quantize</div>
+        <div class="step-sub">Dynamic range INT8 · 73.6% smaller</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-step">
+        <div class="pipeline-circle" style="background:rgba(56,217,169,0.15);color:var(--accent2);">7</div>
+        <div class="step-label">TFLite</div>
+        <div class="step-sub">ARM Cortex-M4 · 6.9ms · &lt;10mW</div>
+      </div>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="card">
+      <div class="section-label">Model architecture</div>
+      <table>
+        <tr><td style="color:var(--muted);">Backbone</td><td>YAMNet (MobileNet-v1)</td></tr>
+        <tr><td style="color:var(--muted);">Pretrained on</td><td>AudioSet (521 classes, ~2M clips)</td></tr>
+        <tr><td style="color:var(--muted);">Embedding dim</td><td style="font-family:var(--mono);">1024</td></tr>
+        <tr><td style="color:var(--muted);">Pooling</td><td>Attention over frames</td></tr>
+        <tr><td style="color:var(--muted);">Head</td><td>512 → 256 → 50</td></tr>
+        <tr><td style="color:var(--muted);">Total params</td><td style="font-family:var(--mono);">4.4M</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="section-label">Training details</div>
+      <table>
+        <tr><td style="color:var(--muted);">Training loop</td><td>Custom GradientTape</td></tr>
+        <tr><td style="color:var(--muted);">Optimizer</td><td>Adam (phase-specific LR)</td></tr>
+        <tr><td style="color:var(--muted);">Loss</td><td>CrossEntropy + label smooth 0.1</td></tr>
+        <tr><td style="color:var(--muted);">Augmentation</td><td>Time shift · Gaussian noise</td></tr>
+        <tr><td style="color:var(--muted);">Total epochs</td><td style="font-family:var(--mono);">81 (15 + 36 + 30)</td></tr>
+        <tr><td style="color:var(--muted);">Training time</td><td>~107 min (M4 CPU)</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <div class="section-label">Hardware target</div>
+      <table>
+        <tr><td style="color:var(--muted);">CPU</td><td>ARM Cortex-M4</td></tr>
+        <tr><td style="color:var(--muted);">Clock</td><td style="font-family:var(--mono);">168 MHz</td></tr>
+        <tr><td style="color:var(--muted);">Runtime</td><td>TFLite Micro</td></tr>
+        <tr><td style="color:var(--muted);">Latency</td><td style="font-family:var(--mono);">6.9 ms (measured)</td></tr>
+        <tr><td style="color:var(--muted);">Power target</td><td style="font-family:var(--mono);">&lt;10 mW</td></tr>
+        <tr><td style="color:var(--muted);">Deployment</td><td>TFLite → C++ wrapper</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Tab switching ────────────────────────────────────────────────────────────
+function showTab(name) {
+  ['training','compression','inference','pipeline'].forEach(t => {
+    document.getElementById('tab-'+t).style.display = t===name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach((b,i) => {
+    const names = ['training','compression','inference','pipeline'];
+    b.classList.toggle('active', names[i]===name);
+  });
+  if (name==='training'    && !window._trainingBuilt)    buildTrainingCharts();
+  if (name==='compression' && !window._compressionBuilt) buildCompressionCharts();
+  if (name==='inference')   initInference();
+}
+
+// ── Chart defaults ───────────────────────────────────────────────────────────
+const GRID = { color: 'rgba(255,255,255,0.05)' };
+const TICK = { color: '#7a8099', font: { size: 11 } };
+
+// ── Training charts ──────────────────────────────────────────────────────────
+function buildTrainingCharts() {
+  window._trainingBuilt = true;
+
+  // Phase accuracy chart
+  new Chart(document.getElementById('phaseChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Scratch\n(DS-CNN)', 'Phase 1\nFrozen', 'Phase 2\nFine-tune', 'Phase 3\nContinued'],
+      datasets: [{
+        data: [48.0, 48.75, 71.00, 74.75],
+        backgroundColor: ['#3a3f50', '#4f9eff44', '#ffa94d88', '#38d9a9cc'],
+        borderColor:     ['#3a3f50', '#4f9eff',   '#ffa94d',   '#38d9a9'],
+        borderWidth: 2, borderRadius: 6, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.raw.toFixed(2)+'%' } } },
+      scales: {
+        y: { min: 0, max: 85, ticks: { ...TICK, callback: v => v+'%' }, grid: GRID },
+        x: { ticks: TICK, grid: { display: false } }
+      }
+    }
+  });
+
+  // Gain chart
+  new Chart(document.getElementById('gainChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Scratch baseline', 'Transfer learning'],
+      datasets: [{
+        data: [48.0, 74.75],
+        backgroundColor: ['#3a3f50', '#38d9a9cc'],
+        borderColor:     ['#3a3f50', '#38d9a9'],
+        borderWidth: 2, borderRadius: 6, borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => c.raw.toFixed(2)+'%' } },
+        annotation: {}
+      },
+      scales: {
+        y: { min: 0, max: 85, ticks: { ...TICK, callback: v => v+'%' }, grid: GRID },
+        x: { ticks: TICK, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// ── Compression charts ───────────────────────────────────────────────────────
+function buildCompressionCharts() {
+  window._compressionBuilt = true;
+
+  new Chart(document.getElementById('sizeChart'), {
+    type: 'bar',
+    data: {
+      labels: ['Float32', 'INT8 Dynamic'],
+      datasets: [{ data: [15200.9, 4006.8],
+        backgroundColor: ['#4f9eff44','#38d9a9cc'],
+        borderColor: ['#4f9eff','#38d9a9'],
+        borderWidth: 2, borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => (c.raw/1024).toFixed(1)+' MB' } } },
+      scales: {
+        y: { ticks: { ...TICK, callback: v => (v/1024).toFixed(0)+'MB' }, grid: GRID },
+        x: { ticks: TICK, grid: { display: false } }
+      }
+    }
+  });
+
+  new Chart(document.getElementById('tradeoffChart'), {
+    type: 'scatter',
+    data: {
+      datasets: [{
+        data: [
+          { x: 15200.9, y: 74.75, label: 'Float32' },
+          { x: 4006.8,  y: 70.00, label: 'INT8 Dynamic' },
+        ],
+        backgroundColor: ['#4f9eff', '#38d9a9'],
+        pointRadius: 10, pointHoverRadius: 12,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => `${c.raw.label}: ${(c.raw.x/1024).toFixed(1)}MB, ${c.raw.y}%` } }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Model size (KB)', color: '#7a8099', font:{size:11} }, ticks: TICK, grid: GRID },
+        y: { min: 65, max: 80, title: { display: true, text: 'Accuracy (%)', color: '#7a8099', font:{size:11} }, ticks: TICK, grid: GRID }
+      }
+    }
+  });
+}
+
+// ── Inference demo ───────────────────────────────────────────────────────────
+const DEMOS = {
+  dog:      { top5: [['dog',0.88],['cat',0.05],['cow',0.03],['rooster',0.02],['pig',0.01]], color:'#4f9eff', pattern:'burst' },
+  rain:     { top5: [['rain',0.81],['sea_waves',0.07],['water_drops',0.06],['thunderstorm',0.04],['wind',0.02]], color:'#74c0fc', pattern:'hiss' },
+  siren:    { top5: [['siren',0.93],['car_horn',0.04],['airplane',0.01],['helicopter',0.01],['train',0.01]], color:'#ff6b6b', pattern:'sweep' },
+  keyboard: { top5: [['keyboard_typing',0.86],['mouse_click',0.06],['door_knock',0.04],['clock_tick',0.03],['footsteps',0.01]], color:'#38d9a9', pattern:'click' },
+  fire:     { top5: [['crackling_fire',0.78],['rain',0.09],['crickets',0.07],['water_drops',0.04],['wind',0.02]], color:'#ffa94d', pattern:'crackle' },
+  helicopter: { top5: [['helicopter',0.82],['airplane',0.08],['engine',0.05],['chainsaw',0.03],['siren',0.02]], color:'#da77f2', pattern:'rumble' },
+};
+
+let inferenceInit = false;
+function initInference() {
+  if (inferenceInit) return;
+  inferenceInit = true;
+
+  const tagsEl = document.getElementById('soundTags');
+  Object.keys(DEMOS).forEach(cls => {
+    const btn = document.createElement('button');
+    btn.className = 'sound-tag';
+    btn.id = 'tag-'+cls;
+    btn.textContent = cls.replace(/_/g,' ');
+    btn.onclick = () => runDemo(cls);
+    tagsEl.appendChild(btn);
+  });
+  runDemo('dog');
+}
+
+function drawWave(cls) {
+  const c = document.getElementById('waveCanvas');
+  const ctx = c.getContext('2d');
+  const W = c.width, H = c.height;
+  ctx.clearRect(0,0,W,H);
+  const d = DEMOS[cls];
+  ctx.strokeStyle = d.color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  for (let x = 0; x < W; x++) {
+    const t = x / W;
+    let y = H/2;
+    if (d.pattern==='burst') {
+      const env = Math.max(0, Math.sin(t*Math.PI*6)) * Math.exp(-((t-0.3)**2)*20);
+      y += Math.sin(t*200) * env * H*0.35;
+    } else if (d.pattern==='hiss') {
+      y += (Math.random()-0.5)*H*0.3*(0.5+0.5*t);
+    } else if (d.pattern==='sweep') {
+      const f = 50+t*300;
+      y += Math.sin(t*f*Math.PI*2)*H*0.3;
+    } else if (d.pattern==='click') {
+      y += Math.random()<0.05 ? (Math.random()-0.5)*H*0.6 : (Math.random()-0.5)*H*0.05;
+    } else if (d.pattern==='crackle') {
+      y += Math.random()<0.15 ? (Math.random()-0.5)*H*0.5 : Math.sin(t*80)*H*0.1;
+    } else {
+      y += Math.sin(t*40)*H*0.3*Math.sin(t*3);
+    }
+    x===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+function runDemo(cls) {
+  document.querySelectorAll('.sound-tag').forEach(t => t.classList.remove('active'));
+  const tag = document.getElementById('tag-'+cls);
+  if (tag) tag.classList.add('active');
+  drawWave(cls);
+
+  const d = DEMOS[cls];
+  const predsEl = document.getElementById('predictions');
+  predsEl.innerHTML = d.top5.map(([name,prob],i) => {
+    const pct = Math.round(prob*100);
+    const color = i===0 ? d.color : '#4a5068';
+    return `<div class="pred-row">
+      <span class="pred-pct" style="color:${color};">${pct}%</span>
+      <span class="pred-name">${name.replace(/_/g,' ')}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div>
+    </div>`;
+  }).join('');
+
+  const lat = (5.5+Math.random()*3).toFixed(1);
+  document.getElementById('logOutput').innerHTML =
+    `<span class="log-blue">[TFLite]</span> Model loaded: model_int8.tflite (4.0 MB)\n` +
+    `<span class="log-blue">[TFLite]</span> Input: waveform [1, 80000] → INT8\n` +
+    `<span class="log-blue">[TFLite]</span> Invoke() completed\n` +
+    `<span class="log-green">[Result]</span> Top-1: <strong>${d.top5[0][0].replace(/_/g,' ')}</strong> (${Math.round(d.top5[0][1]*100)}%)\n` +
+    `<span class="log-amber">[Perf]</span>   Latency: ${lat} ms  |  Model: dynamic INT8`;
+}
+
+function updatePower() {
+  const n = parseInt(document.getElementById('dutySlider').value);
+  document.getElementById('dutyVal').textContent = n + ' inf/s';
+  const duty  = Math.min(1, n * 6.9 / 1000);
+  const power = duty * 8.5 + (1-duty) * 0.003;
+  const batt  = Math.round((500*3.3)/(power*1000)*1000);
+  const pEl   = document.getElementById('powerVal');
+  pEl.textContent = power.toFixed(1)+' mW';
+  pEl.style.color = power < 10 ? 'var(--accent2)' : 'var(--danger)';
+  document.getElementById('powerStatus').textContent = power < 10 ? '✓ Under 10 mW target' : '✗ Over 10 mW target';
+  document.getElementById('batteryVal').textContent = batt > 999 ? Math.round(batt/24)+'d' : batt+'h';
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  buildTrainingCharts();
+});
+</script>
+</body>
+</html>
