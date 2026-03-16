@@ -1,0 +1,20 @@
+# Data and models (too large for GitHub)
+data/
+models/
+*.tflite
+*.keras
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Environment
+.env
+*.log
+
+# Mac
+.DS_Store
